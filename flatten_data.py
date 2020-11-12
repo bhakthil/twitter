@@ -31,7 +31,7 @@ all_image_urls = []
 tweets = {}
 tweet_count = 0
 save_dir = "./output/data"
-
+JOIN_CHAR = '|'
 TWEET_TYPE_ORIGINAL = 0
 TWEET_TYPE_RETWEET = 1
 TWEET_TYPE_REPLY = 2
@@ -41,7 +41,7 @@ NUM_JOBS = 12
 manager = multiprocessing.Manager()
 bad_chars = manager.list()
 # initializing bad_chars_list
-bad_chars = [';', ':', '!', "*",',','|']
+bad_chars = [';', '\"', '!', "*",',','|', '\'']
 
 #final_list = manager.list()
 columns = ['id','created_at','text','source','tweet_type','source_tweet_id','retweeted_tweet_id',
@@ -59,7 +59,7 @@ def get_user_mentions(status):
 	except:
 		pass
 	
-	return '|'.join(interactions)
+	return JOIN_CHAR.join(interactions)
 
 # Returns a list of URLs found in the Tweet
 def get_urls(links):
@@ -73,17 +73,17 @@ def get_urls(links):
 	
 	except:
 		pass
-	return ','.join(urls)
+	return JOIN_CHAR.join(urls)
 
 def get_hashtags(status):
 	try:
-		return '|'.join(status.hashtags)
+		return JOIN_CHAR.join(status.hashtags)
 	except:
 		return None
     
 def get_unrolled_urls(status):
 	try:
-		return '|'.join(status.most_unrolled_urls)
+		return JOIN_CHAR.join(status.most_unrolled_urls)
 	except:
 		return None
 
@@ -107,9 +107,9 @@ def flatten_status(tweet):
 	flat_dict['source_tweet_id'] = status.in_reply_to_status_id if status.in_reply_to_status_id else (status.embedded_tweet.id if status.embedded_tweet else status.id)
 	flat_dict['retweeted_tweet_id'] = status.retweeted_tweet.id if status.retweeted_tweet else None
 	flat_dict['quoted_tweet_id'] = status.quoted_tweet.id if status.quoted_tweet else None
-	flat_dict['quote_count'] = status.quote_count 
-	flat_dict['retweet_count'] = status.retweet_count
-	flat_dict['favorite_count'] = status.favorite_count
+	flat_dict['quote_count'] = status.quote_count if status.quote_count else 0
+	flat_dict['retweet_count'] = status.retweet_count if status.retweet_count else 0
+	flat_dict['favorite_count'] = status.favorite_count if status.favorite_count else 0
 	flat_dict['hashtags'] = get_hashtags(status)
 	flat_dict['most_unrolled_urls'] = get_unrolled_urls(status)
 	flat_dict['tweet_links'] = get_urls(status.tweet_links)
@@ -124,9 +124,9 @@ def flatten_status(tweet):
 		flat_dict['user_following_count'] = status.following_count
 		flat_dict['user_listed_count'] = status['user']['listed_count']
 		flat_dict['user_created_at'] = status["user"]["created_at"]
-		flat_dict['user_favourites_count'] = status.favorite_count
+		flat_dict['user_favourites_count'] = status.favorite_count if status.favorite_count else 0
 		flat_dict['user_verified'] = status["user"]["verified"]
-		flat_dict['user_statuses_count'] = status["user"]["statuses_count"]
+		flat_dict['user_statuses_count'] = status["user"]["statuses_count"] if status["user"]["statuses_count"] else 0
 	return flat_dict
 
 def process_file(targetfile):
@@ -150,7 +150,7 @@ def process_file(targetfile):
     x = len(final_list)
     print('[[{}]] lines processed:{} of {}'.format(base_name, x, len(lines)))
     df_tweets = pd.DataFrame(final_list, columns=columns)
-    df_tweets.to_csv(outfile)
+    df_tweets.to_csv(outfile, sep ='\t', index=False)
     print('[[{}]] Saved data to :{} '.format(base_name, outfile ))
     #shared_list.append(df_tweets)
     return (x , len(lines))
