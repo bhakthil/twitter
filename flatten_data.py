@@ -1,5 +1,6 @@
 from collections import Counter
 from itertools import combinations
+from os import stat
 from twarc import Twarc
 import requests
 import sys
@@ -17,6 +18,9 @@ from p_tqdm import p_map
 from tweet_parser.tweet import Tweet
 from tweet_parser.tweet_parser_errors import NotATweetError
 import traceback
+import urlexpander
+import urllib as ulib
+import mimetypes
 
 # Variables for capturing stuff
 tweets_captured = 0
@@ -41,7 +45,7 @@ NUM_JOBS = 12
 manager = multiprocessing.Manager()
 bad_chars = manager.list()
 # initializing bad_chars_list
-bad_chars = [';', '\"', '!', "*",',','|', '\'']
+bad_chars = ['<','>','?',':', ';', '\"', '!', "*",',','|', '\'']
 
 #final_list = manager.list()
 columns = ['id','created_at','text','source','tweet_type','source_tweet_id','retweeted_tweet_id',
@@ -80,13 +84,21 @@ def get_hashtags(status):
 		return JOIN_CHAR.join(status.hashtags)
 	except:
 		return None
-    
-def get_unrolled_urls(status):
-	try:
-		return JOIN_CHAR.join(status.most_unrolled_urls)
-	except:
-		return None
 
+def filter_images_and_expand(links):
+    expanded_list = []
+    for link in links:
+        try:
+            u = ulib.request.urlopen(link)
+            link_type = u.headers['Content-Type'] #u.headers.gettype() # or using: u.info().gettype()
+            if(link_type and 'image' not in link_type):
+                expanded_list.append(u.geturl())
+        except:
+            #expanded_list.append(link)
+            pass
+        
+    return ''.join(expanded_list)  
+    
 def clean_text(text):
     # stripr control chars
     stripped = ''.join(i for i in text if 31 < ord(i) < 127)
@@ -111,9 +123,9 @@ def flatten_status(tweet):
 	flat_dict['retweet_count'] = status.retweet_count if status.retweet_count else 0
 	flat_dict['favorite_count'] = status.favorite_count if status.favorite_count else 0
 	flat_dict['hashtags'] = get_hashtags(status)
-	flat_dict['most_unrolled_urls'] = get_unrolled_urls(status)
+	flat_dict['most_unrolled_urls'] = filter_images_and_expand(status.most_unrolled_urls)
 	flat_dict['tweet_links'] = get_urls(status.tweet_links)
-
+	
 
 	### User Data
 	if "user" in status:
@@ -134,7 +146,8 @@ def process_file(targetfile):
     outfile = os.path.join(save_dir, '{}.csv'.format(base_name))
     final_list = []
     with open(targetfile , 'r', encoding='utf-8') as f:		#lines = [next(f) for x in range(1000)]
-        lines = f.readlines()
+        #lines = f.readlines()
+        lines = [next(f) for x in range(100)]
         print('[[{}]] Start processing job......'.format(base_name))
         for idx, status in enumerate(lines):
             try:
@@ -162,7 +175,7 @@ if __name__ == '__main__':
 	processed_lines_all = 0
 	total_lines = 0
 	start_time = datetime.now()
-	target = '/tmp/twitter-political/*-json'
+	target = '/tmp/twitter-political/*17-json'
 	files = glob.glob(target)
 	#num_cpu = multiprocessing.cpu_count() - 2 if multiprocessing.cpu_count() > 2 else 1
 	num_cpu = multiprocessing.cpu_count()
